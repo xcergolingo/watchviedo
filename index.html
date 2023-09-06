@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Uploader</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f3f4f6;
+            margin: 50px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #2c3e50;
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        video {
+            margin-top: 20px;
+            max-width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Upload Your Movie</h1>
+
+    <input type="file" id="movieInput" accept="video/mp4">
+    <button onclick="uploadMovie()">Upload</button>
+
+    <h3>Streaming:</h3>
+    <video id="streamingVideo" controls></video>
+
+    <script>
+        function uploadMovie() {
+            let fileInput = document.getElementById('movieInput');
+            if (fileInput.files.length === 0) {
+                alert("Please select a video file to upload.");
+                return;
+            }
+
+            let file = fileInput.files[0];
+            if (file.type !== "video/mp4") {
+                alert("Please upload a .mp4 video file.");
+                return;
+            }
+
+            let api_url = 'https://jn2vareve4.execute-api.us-east-1.amazonaws.com/prod/uploadmovie';
+            let headers = {
+                'Content-Type': 'application/json'
+            };
+            let api_data = {
+                'filename': file.name
+            };
+
+            fetch(api_url, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(api_data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                let presigned_url = data.body.url;
+                return fetch(presigned_url, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'video/mp4'
+                    },
+                    body: file
+                });
+            })
+            .then(response => {
+                if (response.status === 200) {
+                    alert("File uploaded successfully");
+                    let streamingURL = `https://d2ewi6iv2iejo8.cloudfront.net/${file.name}`;
+                    let videoElement = document.getElementById('streamingVideo');
+                    videoElement.src = streamingURL;
+                    videoElement.play();
+                } else {
+                    alert(`Failed to upload file, status code: ${response.status}`);
+                }
+            })
+            .catch(error => {
+                alert("Error occurred while uploading: " + error);
+            });
+        }
+    </script>
+
+</body>
+
+</html>
