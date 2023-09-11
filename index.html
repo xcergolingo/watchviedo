@@ -28,6 +28,11 @@
             margin-top: 10px;
         }
 
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+
         button:hover {
             background-color: #2980b9;
         }
@@ -35,6 +40,24 @@
         video {
             margin-top: 20px;
             max-width: 100%;
+        }
+
+        #chunks {
+            margin-top: 20px;
+        }
+
+        #chunks button {
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        #paginationControls {
+            margin-top: 20px;
+        }
+
+        #paginationControls button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
         }
     </style>
 </head>
@@ -44,14 +67,28 @@
     <h1>Upload Your Movie</h1>
 
     <input type="file" id="movieInput" accept="video/mp4">
-    <button onclick="uploadMovie()">Upload</button>
+    <button onclick="uploadMovie()" id="uploadButton">Upload</button>
+    <button onclick="fetchChunksWrapper()" id="getChunksButton" style="margin-top:10px;">Get Chunks</button>
 
     <h3>Streaming:</h3>
     <video id="streamingVideo" controls></video>
 
+    <div id="chunks"></div>
+    <div id="paginationControls">
+        <button id="prevPage" onclick="previousPage()">Previous</button>
+        <span id="currentPage">1</span> / <span id="totalPages"></span>
+        <button id="nextPage" onclick="nextPage()">Next</button>
+    </div>
+
     <script>
+        let chunksData = [];
+        let currentPage = 1;
+        const CHUNKS_PER_PAGE = 5;
+
         function uploadMovie() {
             let fileInput = document.getElementById('movieInput');
+            let uploadButton = document.getElementById('uploadButton');
+            
             if (fileInput.files.length === 0) {
                 alert("Please select a video file to upload.");
                 return;
@@ -62,6 +99,38 @@
                 alert("Please upload a .mp4 video file.");
                 return;
             }
+
+            let streamingURL = `https://d2ewi6iv2iejo8.cloudfront.net/${file.name}`;
+            let videoElement = document.getElementById('streamingVideo');
+            videoElement.src = streamingURL;
+
+			videoElement.onerror = function() {
+				// The video doesn't exist or isn't playable. Proceed with upload.
+				videoElement.onerror = null; // Remove the error event listener
+				videoElement.onloadeddata = null; // Remove the loaded data event listener
+				proceedWithUpload(file);
+			};
+
+			videoElement.onloadeddata = function() {
+				// The video is playable which means it exists. Ask the user for the next step.
+				let userResponse = confirm("The video already exists. Do you want to override it?");
+				videoElement.onerror = null; // Remove the error event listener
+				videoElement.onloadeddata = null; // Remove the loaded data event listener
+				if (userResponse) {
+					proceedWithUpload(file);
+				} else {
+					alert("Using the existing video.");
+					fetchChunks(file.name);
+				}
+			};
+
+        }
+
+        function proceedWithUpload(file) {
+            let uploadButton = document.getElementById('uploadButton');
+
+            // Grey out the upload button
+            uploadButton.disabled = true;
 
             let api_url = 'https://jn2vareve4.execute-api.us-east-1.amazonaws.com/prod/uploadmovie';
             let headers = {
@@ -93,17 +162,134 @@
                     let streamingURL = `https://d2ewi6iv2iejo8.cloudfront.net/${file.name}`;
                     let videoElement = document.getElementById('streamingVideo');
                     videoElement.src = streamingURL;
-                    videoElement.play();
+                    fetchChunks(file.name);
                 } else {
                     alert(`Failed to upload file, status code: ${response.status}`);
                 }
+                uploadButton.disabled = false; // Re-enable the upload button
             })
             .catch(error => {
                 alert("Error occurred while uploading: " + error);
+                uploadButton.disabled = false; // Re-enable the upload button in case of error
             });
         }
+
+		// New wrapper function for fetchChunks
+		function fetchChunksWrapper() {
+			let fileInput = document.getElementById('movieInput');
+			if (fileInput.files.length === 0) {
+				alert("Please select and upload a video first.");
+				return;
+			}
+			let file = fileInput.files[0];
+			fetchChunks(file.name);
+		}
+
+		function fetchChunks(filename) {
+			// Clear any existing chunks
+			const chunksContainer = document.getElementById("chunks");
+			while (chunksContainer.firstChild) {
+				chunksContainer.removeChild(chunksContainer.firstChild);
+			}
+
+			const apiUrl = 'https://jn2vareve4.execute-api.us-east-1.amazonaws.com/prod/querymoviechunk';
+			const payload = JSON.stringify({ filename: filename });
+
+			fetch(apiUrl, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ filename: filename })
+			})
+			.then(response => {
+				if (!response.ok) {
+					throw new Error('Failed to fetch data');
+				}
+				return response.json();
+			})
+			.then(data => {
+				if (data.statusCode === 200 && data.body) {
+					if (data.body.length === 0) {
+						alert("Chunks are being produced, come back later.");
+					} else {
+						displayChunks(data.body);
+					}
+				} else {
+					console.error('Invalid response format or error from the server');
+				}
+			})
+			.catch(error => {
+				console.error('Error fetching chunks:', error);
+			});
+		}
+
+        function displayChunks(data) {
+            chunksData = data; // Save all chunks data to global variable
+            updateChunksDisplay();
+            updatePaginationControls();
+        }
+
+        function updateChunksDisplay() {
+            const chunksContainer = document.getElementById("chunks");
+            while (chunksContainer.firstChild) {
+                chunksContainer.removeChild(chunksContainer.firstChild);
+            }
+
+            const startIndex = (currentPage - 1) * CHUNKS_PER_PAGE;
+            for (let i = startIndex; i < startIndex + CHUNKS_PER_PAGE && i < chunksData.length; i++) {
+                const button = document.createElement("button");
+                button.innerText = "Chunk " + (i + 1);
+                button.onclick = function() {
+                    playChunk(chunksData[i]);
+                };
+                chunksContainer.appendChild(button);
+            }
+        }
+
+        function updatePaginationControls() {
+            document.getElementById("currentPage").textContent = currentPage;
+            const totalPages = Math.ceil(chunksData.length / CHUNKS_PER_PAGE);
+            document.getElementById("totalPages").textContent = totalPages;
+
+            document.getElementById("prevPage").disabled = currentPage <= 1;
+            document.getElementById("nextPage").disabled = currentPage >= totalPages;
+        }
+
+        function nextPage() {
+            currentPage++;
+            updateChunksDisplay();
+            updatePaginationControls();
+        }
+
+        function previousPage() {
+            currentPage--;
+            updateChunksDisplay();
+            updatePaginationControls();
+        }
+
+        function playChunk(chunk) {
+            const videoElement = document.getElementById('streamingVideo');
+            videoElement.currentTime = timeStringToSeconds(chunk.start_time);
+            videoElement.play();
+			
+            videoElement.ontimeupdate = function() {
+                if (videoElement.currentTime >= timeStringToSeconds(chunk.end_time)) {
+                    videoElement.pause();
+                    // Remove event listener after chunk ends
+                    videoElement.ontimeupdate = null;
+                }
+            };
+        }
+
+        function timeStringToSeconds(str) {
+            const parts = str.split(":");
+            const hours = parseInt(parts[0], 10);
+            const minutes = parseInt(parts[1], 10);
+            const seconds = parseFloat(parts[2].replace(',', '.'));
+            return (hours * 3600) + (minutes * 60) + seconds;
+        }
+
     </script>
-
 </body>
-
 </html>
