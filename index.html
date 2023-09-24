@@ -137,7 +137,8 @@
                 'Content-Type': 'application/json'
             };
             let api_data = {
-                'filename': file.name
+                'filename': file.name,
+		'ifchunk': true
             };
 
             fetch(api_url, {
