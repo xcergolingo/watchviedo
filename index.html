@@ -125,55 +125,67 @@
 			};
 
         }
+		function proceedWithUpload(file) {
+			let uploadButton = document.getElementById('uploadButton');
 
-        function proceedWithUpload(file) {
-            let uploadButton = document.getElementById('uploadButton');
+			// Grey out the upload button
+			uploadButton.disabled = true;
 
-            // Grey out the upload button
-            uploadButton.disabled = true;
+			let api_url = 'https://jn2vareve4.execute-api.us-east-1.amazonaws.com/prod/uploadmovie';
+			let headers = {
+				'Content-Type': 'application/json'
+			};
+			let api_data = {
+				'filename': file.name				
+			};
 
-            let api_url = 'https://jn2vareve4.execute-api.us-east-1.amazonaws.com/prod/uploadmovie';
-            let headers = {
-                'Content-Type': 'application/json'
-            };
-            let api_data = {
-                'filename': file.name,
-		'ifchunk': true
-            };
-
-            fetch(api_url, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(api_data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                let presigned_url = data.body.url;
-                return fetch(presigned_url, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'video/mp4'
-                    },
-                    body: file
-                });
-            })
-            .then(response => {
-                if (response.status === 200) {
-                    alert("File uploaded successfully");
-                    let streamingURL = `https://d2ewi6iv2iejo8.cloudfront.net/${file.name}`;
-                    let videoElement = document.getElementById('streamingVideo');
-                    videoElement.src = streamingURL;
-                    fetchChunks(file.name);
-                } else {
-                    alert(`Failed to upload file, status code: ${response.status}`);
-                }
-                uploadButton.disabled = false; // Re-enable the upload button
-            })
-            .catch(error => {
-                alert("Error occurred while uploading: " + error);
-                uploadButton.disabled = false; // Re-enable the upload button in case of error
-            });
-        }
+			fetch(api_url, {
+				method: 'POST',
+				headers: headers,
+				body: JSON.stringify(api_data)
+			})
+			.then(response => response.json())
+			.then(data => {
+				let presigned_url = data.body.url;
+				return fetch(presigned_url, {
+					method: 'PUT',
+					headers: {
+						'Content-Type': 'video/mp4'
+					},
+					body: file
+				});
+			})
+			.then(response => {
+				if (response.status === 200) {
+					// Call generatemoviechunk API here
+					let generate_chunk_url = 'https://jn2vareve4.execute-api.us-east-1.amazonaws.com/prod/generatemoviechunk';
+					return fetch(generate_chunk_url, {
+						method: 'POST',
+						headers: headers,
+						body: JSON.stringify(api_data)
+					});
+				} else {
+					throw new Error(`Failed to upload file, status code: ${response.status}`);
+				}
+			})
+			.then(response => {
+				if (response.status === 200) {
+					alert("File uploaded successfully and movie chunks request sent, please be patient.");
+					let streamingURL = `https://d2ewi6iv2iejo8.cloudfront.net/${file.name}`;
+					let videoElement = document.getElementById('streamingVideo');
+					videoElement.src = streamingURL;
+					// fetchChunks(file.name); // Call this if necessary
+				} else {
+					alert(`Failed to generate movie chunks, status code: ${response.status}`);
+				}
+			})
+			.catch(error => {
+				alert("Error occurred: " + error);
+			})
+			.finally(() => {
+				uploadButton.disabled = false; // Re-enable the upload button
+			});
+		}
 
 		// New wrapper function for fetchChunks
 		function fetchChunksWrapper() {
