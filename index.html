@@ -10,7 +10,7 @@
         body {
             font-family: Arial, sans-serif;
             background-color: #f3f4f6;
-            margin: 50px;
+            margin: 10px;
             text-align: center;
         }
 
@@ -59,11 +59,25 @@
             background-color: #bdc3c7;
             cursor: not-allowed;
         }
+
+        /* Responsive CSS */
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 24px;
+            }
+
+            button {
+                padding: 8px 16px;
+            }
+
+            #paginationControls button {
+                padding: 8px 12px;
+            }
+        }
     </style>
 </head>
 
 <body>
-
     <h1>Upload Your Movie</h1>
 
     <input type="file" id="movieInput" accept="video/mp4">
@@ -302,7 +316,7 @@
             const seconds = parseFloat(parts[2].replace(',', '.'));
             return (hours * 3600) + (minutes * 60) + seconds;
         }
-
     </script>
 </body>
+
 </html>
