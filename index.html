@@ -80,8 +80,9 @@
 <body>
     <h1>Upload Your Movie</h1>
 
-    <input type="file" id="movieInput" accept="video/mp4">
+	<input type="file" id="movieInput" accept="video/*">
     <button onclick="uploadMovie()" id="uploadButton">Upload</button>
+	
     <button onclick="fetchChunksWrapper()" id="getChunksButton" style="margin-top:10px;">Get Chunks</button>
 
     <h3>Streaming:</h3>
@@ -109,10 +110,19 @@
             }
 
             let file = fileInput.files[0];
-            if (file.type !== "video/mp4") {
-                alert("Please upload a .mp4 video file.");
+            
+            // Updated supported video types
+            const supportedVideoTypes = [
+                "video/mp4",
+                "video/quicktime", // MIME type for .mov files
+                // Add additional supported types as needed
+            ];
+            
+            if (!supportedVideoTypes.includes(file.type)) {
+                alert("Please upload a supported video file type (.mp4, .mov, etc.).");
                 return;
             }
+
 
             let streamingURL = `https://d2ewi6iv2iejo8.cloudfront.net/${file.name}`;
             let videoElement = document.getElementById('streamingVideo');
@@ -139,6 +149,9 @@
 			};
 
         }
+		
+		
+		
 		function proceedWithUpload(file) {
 			let uploadButton = document.getElementById('uploadButton');
 
