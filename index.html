@@ -163,7 +163,10 @@
 				'Content-Type': 'application/json'
 			};
 			let api_data = {
-				'filename': file.name				
+				'filename': file.name,
+				'user_name': 'testuser',
+                		'sentence': 'how are you',
+                		'lang': 'English'	
 			};
 
 			fetch(api_url, {
